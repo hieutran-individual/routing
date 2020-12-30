@@ -51,7 +51,7 @@ func New(r *mux.Router, pathPrefix string) Routing {
 
 func useMiddlewares(fn http.Handler, middlewares ...mux.MiddlewareFunc) http.Handler {
 	handler := fn
-	for i := len(middlewares); i >= 0; i-- {
+	for i := len(middlewares) - 1; i >= 0; i-- {
 		handler = middlewares[i](fn)
 	}
 	return handler
