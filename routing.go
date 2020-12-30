@@ -34,6 +34,9 @@ type Routing interface {
 	Use(...mux.MiddlewareFunc)
 	Handle(path string, handler http.Handler) *mux.Route
 	HandleFunc(path string, handlerFunc func(http.ResponseWriter, *http.Request) error) *mux.Route
+	ReadSchema(r *http.Request, v interface{}) error
+	WriteJSON(w http.ResponseWriter, v interface{})
+	ReadJSON(r *http.Request, v interface{}) error
 }
 
 func New(r *mux.Router, pathPrefix string) Routing {
