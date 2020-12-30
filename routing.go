@@ -50,9 +50,11 @@ func New(r *mux.Router, pathPrefix string) Routing {
 }
 
 func useMiddlewares(fn http.Handler, middlewares ...mux.MiddlewareFunc) http.Handler {
-	handler := fn
+	var (
+		handler http.Handler = fn
+	)
 	for i := len(middlewares) - 1; i >= 0; i-- {
-		handler = middlewares[i](fn)
+		handler = middlewares[i].Middleware(handler)
 	}
 	return handler
 }
@@ -62,7 +64,7 @@ func (r *routing) Handle(path string, handler http.Handler) *mux.Route {
 }
 
 func (r *routing) HandleFunc(path string, handlerFunc func(http.ResponseWriter, *http.Request) error) *mux.Route {
-	return r.Handle(path, useMiddlewares(HandlerFunc(handlerFunc), r.middlewares...))
+	return r.router.HandleFunc(path, useMiddlewares(HandlerFunc(handlerFunc), r.middlewares...).ServeHTTP)
 }
 
 func (r *routing) Use(middlewares ...mux.MiddlewareFunc) {
