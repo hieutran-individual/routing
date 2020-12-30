@@ -22,25 +22,6 @@ func (r *responseWriter) WriteHeader(status int) {
 
 func (ro *routing) useBase(fn http.Handler) http.Handler {
 	return HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
-		var (
-			writer io.Writer
-		)
-		func() {
-			if _, err := os.Stat(ro.logDir); os.IsNotExist(err) {
-				if err = os.MkdirAll(ro.logDir, 0655); err != nil {
-					writer = os.Stdout
-					return
-				}
-				now := time.Now().Format("02-01-2006")
-				logfile, err := os.OpenFile(filepath.Join(ro.logDir, now), os.O_APPEND|os.O_CREATE|os.O_RDWR, 655)
-				if err != nil {
-					writer = os.Stdout
-					return
-				}
-				defer logfile.Close()
-				writer = io.MultiWriter(os.Stdout, logfile)
-			}
-		}()
 		rw := &responseWriter{
 			status:         200,
 			ResponseWriter: w,
@@ -50,10 +31,33 @@ func (ro *routing) useBase(fn http.Handler) http.Handler {
 			"method": r.Method,
 			"status": rw.status,
 		}
-		ro.mu.Lock()
-		defer ro.mu.Unlock()
-		ro.logger.SetOutput(writer)
-		ro.logger.WithFields(fields).Println(r.URL.Path)
+		ro.writeLog(r.URL.Path, fields)
 		return nil
 	})
+}
+
+func (ro *routing) writeLog(path string, fields logrus.Fields) {
+	writer, logCloser := func() (io.Writer, io.Closer) {
+		if _, err := os.Stat(ro.logDir); os.IsNotExist(err) {
+			if err = os.MkdirAll(ro.logDir, 0655); err != nil {
+				return os.Stdout, nil
+			}
+		}
+		now := time.Now().Format("02-01-2006")
+		logfile, err := os.OpenFile(filepath.Join(ro.logDir, now), os.O_APPEND|os.O_CREATE|os.O_RDWR, 655)
+		if err != nil {
+			return os.Stdout, nil
+		}
+
+		return io.MultiWriter(os.Stdout, logfile), io.Closer(logfile)
+	}()
+	defer func() {
+		if logCloser != nil {
+			logCloser.Close()
+		}
+	}()
+	ro.mu.Lock()
+	defer ro.mu.Unlock()
+	ro.logger.SetOutput(writer)
+	ro.logger.WithFields(fields).Println(path)
 }
