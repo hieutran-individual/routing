@@ -1,21 +1,24 @@
 package routing
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
 	"sync"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/schema"
 	"github.com/sirupsen/logrus"
 )
 
 type routing struct {
-	router      *mux.Router
-	middlewares []mux.MiddlewareFunc
-	logDir      string
-	logger      *logrus.Logger
-	mu          sync.Mutex
+	router         *mux.Router
+	middlewares    []mux.MiddlewareFunc
+	logDir         string
+	logger         *logrus.Logger
+	mu             sync.Mutex
+	maxBytesReader *int64
 }
 
 // The HandlerFunc type is an adapter to allow the use of
@@ -63,4 +66,27 @@ func (r *routing) Use(middlewares ...mux.MiddlewareFunc) {
 	for _, mdw := range middlewares {
 		r.middlewares = append(r.middlewares, mdw)
 	}
+}
+func (h *routing) ReadJSON(r *http.Request, v interface{}) error {
+	var (
+		maxBytesReader int64
+	)
+	if h.maxBytesReader != nil {
+		maxBytesReader = *h.maxBytesReader
+	} else {
+		maxBytesReader = 10 << 20
+	}
+	body := http.MaxBytesReader(nil, r.Body, maxBytesReader)
+	return json.NewDecoder(body).Decode(v)
+}
+
+func (h *routing) WriteJSON(w http.ResponseWriter, v interface{}) {
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+func (h *routing) ReadSchema(r *http.Request, v interface{}) error {
+	return schema.NewDecoder().Decode(v, r.URL.Query())
 }
