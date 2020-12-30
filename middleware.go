@@ -44,20 +44,20 @@ func (ro *routing) writeLog(path string, fields logrus.Fields) {
 			}
 		}
 		now := time.Now().Format("02-01-2006")
-		logfile, err := os.OpenFile(filepath.Join(ro.logDir, now), os.O_APPEND|os.O_CREATE|os.O_RDWR, 655)
+		logfile, err := os.OpenFile(filepath.Join(ro.logDir, now+".log"), os.O_APPEND|os.O_CREATE|os.O_RDWR, 0655)
 		if err != nil {
 			return os.Stdout, nil
 		}
-
-		return io.MultiWriter(os.Stdout, logfile), io.Closer(logfile)
+		return io.MultiWriter(os.Stdout, logfile), logfile
 	}()
+	ro.mu.Lock()
+	defer ro.mu.Unlock()
 	defer func() {
 		if logCloser != nil {
 			logCloser.Close()
 		}
 	}()
-	ro.mu.Lock()
-	defer ro.mu.Unlock()
 	ro.logger.SetOutput(writer)
 	ro.logger.WithFields(fields).Println(path)
+
 }

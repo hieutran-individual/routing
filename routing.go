@@ -37,6 +37,7 @@ type Routing interface {
 	ReadSchema(r *http.Request, v interface{}) error
 	WriteJSON(w http.ResponseWriter, v interface{})
 	ReadJSON(r *http.Request, v interface{}) error
+	SetLogDir(string)
 }
 
 func New(r *mux.Router, pathPrefix string) Routing {
@@ -94,4 +95,8 @@ func (h *routing) WriteJSON(w http.ResponseWriter, v interface{}) {
 
 func (h *routing) ReadSchema(r *http.Request, v interface{}) error {
 	return schema.NewDecoder().Decode(v, r.URL.Query())
+}
+
+func (h *routing) SetLogDir(path string) {
+	h.logDir = path
 }
