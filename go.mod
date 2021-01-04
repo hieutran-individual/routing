@@ -1,4 +1,4 @@
-module github.com/hieutran.individual/routing
+module github.com/hieutran-individual/routing
 
 go 1.15
 

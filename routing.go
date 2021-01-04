@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -12,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type routing struct {
+type logRoute struct {
 	router         *mux.Router
 	middlewares    []mux.MiddlewareFunc
 	logDir         string
@@ -21,32 +22,49 @@ type routing struct {
 	maxBytesReader *int64
 }
 
+type LogFn func(fields logrus.Fields)
+
 // The HandlerFunc type is an adapter to allow the use of
 // ordinary functions as HTTP handlers.
-type HandlerFunc func(w http.ResponseWriter, r *http.Request) error
+type HandlerFunc func(w http.ResponseWriter, r *http.Request, l LogFn) error
 
 // ServeHTTP calls f(w, r).
 func (h HandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	h(w, r)
+	fields, ok := r.Context().Value(CtxLogFn).(logrus.Fields)
+	if !ok {
+		fields = logrus.Fields{}
+		ctx := context.WithValue(r.Context(), CtxLogFn, fields)
+		r = r.WithContext(ctx)
+	}
+	h(w, r, LogFn(func(f logrus.Fields) {
+		for k, v := range f {
+			fields[k] = v
+		}
+	}))
 }
 
-type Routing interface {
+type LogRoute interface {
 	Use(...mux.MiddlewareFunc)
 	Handle(path string, handler http.Handler) *mux.Route
-	HandleFunc(path string, handlerFunc func(http.ResponseWriter, *http.Request) error) *mux.Route
+	HandleFunc(path string, handlerFunc http.HandlerFunc) *mux.Route
+	DoHandler(path string, handlerFunc HandlerFunc) *mux.Route
 	ReadSchema(r *http.Request, v interface{}) error
 	WriteJSON(w http.ResponseWriter, v interface{})
 	ReadJSON(r *http.Request, v interface{}) error
 	SetLogDir(string)
 }
 
-func New(r *mux.Router, pathPrefix string) Routing {
+func New(r *mux.Router, pathPrefix string) LogRoute {
 	workingDir, err := os.Getwd()
 	if err != nil {
 		log.Fatalf("cannot write get working directory: %+v", err)
 	}
-	ro := &routing{router: r.PathPrefix(pathPrefix).Subrouter(), logDir: workingDir, logger: logrus.New()}
-	ro.middlewares = []mux.MiddlewareFunc{ro.useBase}
+	ro := &logRoute{router: r.PathPrefix(pathPrefix).Subrouter(), logDir: workingDir, logger: logrus.New()}
+	ro.middlewares = []mux.MiddlewareFunc{ro.useLogging}
+	ro.logger.SetFormatter(&logrus.JSONFormatter{
+		PrettyPrint:     true,
+		TimestampFormat: "02-01-2006 15:04:05",
+	})
 	return ro
 }
 
@@ -60,20 +78,24 @@ func useMiddlewares(fn http.Handler, middlewares ...mux.MiddlewareFunc) http.Han
 	return handler
 }
 
-func (r *routing) Handle(path string, handler http.Handler) *mux.Route {
+func (r *logRoute) Handle(path string, handler http.Handler) *mux.Route {
 	return r.router.Handle(path, useMiddlewares(handler, r.middlewares...))
 }
 
-func (r *routing) HandleFunc(path string, handlerFunc func(http.ResponseWriter, *http.Request) error) *mux.Route {
+func (r *logRoute) HandleFunc(path string, handlerFunc http.HandlerFunc) *mux.Route {
+	return r.router.HandleFunc(path, useMiddlewares(handlerFunc, r.middlewares...).ServeHTTP)
+}
+
+func (r *logRoute) DoHandler(path string, handlerFunc HandlerFunc) *mux.Route {
 	return r.router.HandleFunc(path, useMiddlewares(HandlerFunc(handlerFunc), r.middlewares...).ServeHTTP)
 }
 
-func (r *routing) Use(middlewares ...mux.MiddlewareFunc) {
+func (r *logRoute) Use(middlewares ...mux.MiddlewareFunc) {
 	for _, mdw := range middlewares {
 		r.middlewares = append(r.middlewares, mdw)
 	}
 }
-func (h *routing) ReadJSON(r *http.Request, v interface{}) error {
+func (h *logRoute) ReadJSON(r *http.Request, v interface{}) error {
 	var (
 		maxBytesReader int64
 	)
@@ -86,17 +108,17 @@ func (h *routing) ReadJSON(r *http.Request, v interface{}) error {
 	return json.NewDecoder(body).Decode(v)
 }
 
-func (h *routing) WriteJSON(w http.ResponseWriter, v interface{}) {
+func (h *logRoute) WriteJSON(w http.ResponseWriter, v interface{}) {
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 }
 
-func (h *routing) ReadSchema(r *http.Request, v interface{}) error {
+func (h *logRoute) ReadSchema(r *http.Request, v interface{}) error {
 	return schema.NewDecoder().Decode(v, r.URL.Query())
 }
 
-func (h *routing) SetLogDir(path string) {
+func (h *logRoute) SetLogDir(path string) {
 	h.logDir = path
 }
