@@ -3,6 +3,7 @@ package routing
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -24,11 +25,8 @@ type logRoute struct {
 
 type LogFn func(fields logrus.Fields)
 
-// The HandlerFunc type is an adapter to allow the use of
-// ordinary functions as HTTP handlers.
 type HandlerFunc func(w http.ResponseWriter, r *http.Request, l LogFn) error
 
-// ServeHTTP calls f(w, r).
 func (h HandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fields, ok := r.Context().Value(CtxLogFn).(logrus.Fields)
 	if !ok {
@@ -36,11 +34,13 @@ func (h HandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ctx := context.WithValue(r.Context(), CtxLogFn, fields)
 		r = r.WithContext(ctx)
 	}
-	h(w, r, LogFn(func(f logrus.Fields) {
+	if err := h(w, r, LogFn(func(f logrus.Fields) {
 		for k, v := range f {
 			fields[k] = v
 		}
-	}))
+	})); err != nil {
+		fields["error"] = fmt.Sprintf("%+v", err)
+	}
 }
 
 type LogRoute interface {
@@ -95,6 +95,7 @@ func (r *logRoute) Use(middlewares ...mux.MiddlewareFunc) {
 		r.middlewares = append(r.middlewares, mdw)
 	}
 }
+
 func (h *logRoute) ReadJSON(r *http.Request, v interface{}) error {
 	var (
 		maxBytesReader int64
