@@ -125,7 +125,7 @@ type ResponseWithStatus struct {
 
 func (h *logRoute) WriteJSONGrpc(w http.ResponseWriter, v interface{}, err error) {
 	status, ok := status.FromError(err)
-	if ok {
+	if !ok {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 	if status.Code() != codes.OK {
