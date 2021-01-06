@@ -12,6 +12,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/schema"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type logRoute struct {
@@ -51,6 +53,7 @@ type LogRoute interface {
 	ReadSchema(r *http.Request, v interface{}) error
 	WriteJSON(w http.ResponseWriter, v interface{})
 	ReadJSON(r *http.Request, v interface{}) error
+	WriteJSONGrpc(w http.ResponseWriter, v interface{}, err error)
 	SetLogDir(string)
 }
 
@@ -114,6 +117,22 @@ func (h *logRoute) WriteJSON(w http.ResponseWriter, v interface{}) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+}
+
+type ResponseWithStatus struct {
+	*status.Status
+}
+
+func (h *logRoute) WriteJSONGrpc(w http.ResponseWriter, v interface{}, err error) {
+	status, ok := status.FromError(err)
+	if ok {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	if status.Code() != codes.OK {
+		h.WriteJSON(w, &ResponseWithStatus{status})
+		return
+	}
+	h.WriteJSON(w, v)
 }
 
 func (h *logRoute) ReadSchema(r *http.Request, v interface{}) error {
