@@ -36,11 +36,14 @@ func (h HandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ctx := context.WithValue(r.Context(), CtxLogFn, fields)
 		r = r.WithContext(ctx)
 	}
-	if err := h(w, r, LogFn(func(f logrus.Fields) {
+	fmt.Println("ok")
+	err := h(w, r, func(f logrus.Fields) {
+		fmt.Println("enter")
 		for k, v := range f {
 			fields[k] = v
 		}
-	})); err != nil {
+	})
+	if err != nil {
 		fields["error"] = fmt.Sprintf("%+v", err)
 	}
 }
