@@ -14,6 +14,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	spb "google.golang.org/genproto/googleapis/rpc/status"
 )
 
 type logRoute struct {
@@ -36,9 +38,7 @@ func (h HandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ctx := context.WithValue(r.Context(), CtxLogFn, fields)
 		r = r.WithContext(ctx)
 	}
-	fmt.Println("ok")
 	err := h(w, r, func(f logrus.Fields) {
-		fmt.Println("enter")
 		for k, v := range f {
 			fields[k] = v
 		}
@@ -57,6 +57,7 @@ type LogRoute interface {
 	WriteJSON(w http.ResponseWriter, v interface{})
 	ReadJSON(r *http.Request, v interface{}) error
 	WriteJSONGrpc(w http.ResponseWriter, v interface{}, err error)
+	ParseUrlVars(r *http.Request, v interface{}) error
 	SetLogDir(string)
 }
 
@@ -123,7 +124,7 @@ func (h *logRoute) WriteJSON(w http.ResponseWriter, v interface{}) {
 }
 
 type ResponseWithStatus struct {
-	*status.Status
+	*spb.Status
 }
 
 func (h *logRoute) WriteJSONGrpc(w http.ResponseWriter, v interface{}, err error) {
@@ -132,7 +133,7 @@ func (h *logRoute) WriteJSONGrpc(w http.ResponseWriter, v interface{}, err error
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 	if status.Code() != codes.OK {
-		h.WriteJSON(w, &ResponseWithStatus{status})
+		h.WriteJSON(w, &ResponseWithStatus{status.Proto()})
 		return
 	}
 	h.WriteJSON(w, v)
@@ -140,6 +141,15 @@ func (h *logRoute) WriteJSONGrpc(w http.ResponseWriter, v interface{}, err error
 
 func (h *logRoute) ReadSchema(r *http.Request, v interface{}) error {
 	return schema.NewDecoder().Decode(v, r.URL.Query())
+}
+
+func (h *logRoute) ParseUrlVars(r *http.Request, v interface{}) error {
+	vars := mux.Vars(r)
+	buf, err := json.Marshal(vars)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(buf, v)
 }
 
 func (h *logRoute) SetLogDir(path string) {
