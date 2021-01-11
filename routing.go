@@ -117,6 +117,7 @@ func (h *logRoute) ReadJSON(r *http.Request, v interface{}) error {
 }
 
 func (h *logRoute) WriteJSON(w http.ResponseWriter, v interface{}) {
+	w.Header().Add("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
