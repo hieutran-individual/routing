@@ -106,7 +106,6 @@ func (h *logRouting) Subrouter(path string) *logRouting {
 		logDir: h.logDir,
 		logger: h.logger,
 	}
-	fmt.Println("length", len(h.middlewares))
 	ro.Use(h.middlewares...)
 	return ro
 }
