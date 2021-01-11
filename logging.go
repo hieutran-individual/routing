@@ -15,31 +15,30 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type responseWriter struct {
+type ResponseWriter struct {
 	http.ResponseWriter
-	response []byte
-	buff     *bytes.Buffer
-	status   int
+	buff   *bytes.Buffer
+	status int
 }
 
-func (r *responseWriter) WriteHeader(status int) {
+func (r *ResponseWriter) WriteHeader(status int) {
 	r.status = status
 	r.ResponseWriter.WriteHeader(status)
 }
 
-func (r *responseWriter) Header() http.Header {
+func (r *ResponseWriter) Header() http.Header {
 	return r.ResponseWriter.Header()
 }
 
-func (r *responseWriter) Write(body []byte) (int, error) {
+func (r *ResponseWriter) Write(body []byte) (int, error) {
 	contentType := http.DetectContentType(body)
-	fmt.Println("contentType", contentType)
 	if !strings.Contains(contentType, "text/plain") && !strings.Contains(contentType, "application/json") {
 		return r.ResponseWriter.Write(body)
 	}
 	if len(body) >= 2<<20 {
-		r.response = nil
+		r.buff = nil
 	} else {
+		fmt.Println("enter")
 		r.buff = &bytes.Buffer{}
 		writer := io.MultiWriter(r.ResponseWriter, r.buff)
 		return writer.Write(body)
@@ -49,7 +48,7 @@ func (r *responseWriter) Write(body []byte) (int, error) {
 
 func (ro *logRoute) useLogging(fn http.Handler) http.Handler {
 	return HandlerFunc(func(w http.ResponseWriter, r *http.Request, l LogFn) error {
-		rw := &responseWriter{
+		rw := &ResponseWriter{
 			status:         200,
 			ResponseWriter: w,
 		}
@@ -82,7 +81,7 @@ func (ro *logRoute) useLogging(fn http.Handler) http.Handler {
 			"status":       rw.status,
 			"content-type": rw.Header().Get("Content-Type"),
 		}
-		if rw.response != nil {
+		if rw.buff != nil {
 			body := logrus.Fields{}
 			if err := json.NewDecoder(rw.buff).Decode(&body); err != nil {
 				logResponse["body"] = errors.WithMessage(err, "cannot decode response body")
