@@ -32,6 +32,7 @@ func (r *responseWriter) Header() http.Header {
 
 func (r *responseWriter) Writer(body []byte) (int, error) {
 	contentType := http.DetectContentType(body)
+	fmt.Println(contentType)
 	if contentType != "application/json" {
 		return r.ResponseWriter.Write(body)
 	}
@@ -66,15 +67,10 @@ func (ro *logRoute) useLogging(fn http.Handler) http.Handler {
 			"request-uri":    r.RequestURI,
 			"referer":        r.Referer(),
 		}
-		contentType := rw.Header().Get("Content-Type")
 		logResponse := logrus.Fields{
 			"status": rw.status,
 		}
-		if contentType == "application/json" {
-			logResponse["Content-Type"] = "application/json"
-			if rw.response == nil {
-				logResponse["body"] = "body is too large to logging here"
-			}
+		if rw.response != nil {
 			body := logrus.Fields{}
 			if err := json.NewDecoder(rw.buff).Decode(&body); err != nil {
 				logResponse["body"] = errors.WithMessage(err, "cannot decode response body")
