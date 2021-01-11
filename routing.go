@@ -43,8 +43,8 @@ func (h HandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fields["error"] = fmt.Sprintf("%+v", err)
 		} else {
 			fields["error"] = logrus.Fields{
-				"code": status.Code(),
-				// "message"
+				"code":    status.Code,
+				"message": status.Message,
 			}
 		}
 	}
