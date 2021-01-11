@@ -37,8 +37,7 @@ func (r *responseWriter) Write(body []byte) (int, error) {
 	if !strings.Contains(contentType, "text/plain") && !strings.Contains(contentType, "application/json") {
 		return r.ResponseWriter.Write(body)
 	}
-	fmt.Println(len(body), 2>>20)
-	if len(body) >= 2>>20 {
+	if len(body) >= 2<<20 {
 		r.response = nil
 	} else {
 		r.buff = &bytes.Buffer{}
@@ -80,9 +79,8 @@ func (ro *logRoute) useLogging(fn http.Handler) http.Handler {
 		}
 		fields["http/request"] = logRequest
 		logResponse := logrus.Fields{
-			"status":         rw.status,
-			"content-type":   rw.Header().Get("Content-Type"),
-			"content-length": rw.Header().Get("Content-Length"),
+			"status":       rw.status,
+			"content-type": rw.Header().Get("Content-Type"),
 		}
 		if rw.response != nil {
 			body := logrus.Fields{}
