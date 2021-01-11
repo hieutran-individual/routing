@@ -36,7 +36,7 @@ func (r *responseWriter) Write(body []byte) (int, error) {
 	if !strings.Contains(contentType, "text/plain") && !strings.Contains(contentType, "application/json") {
 		return r.ResponseWriter.Write(body)
 	}
-	if len(body) <= 2>>20 {
+	if len(body) >= 2>>20 {
 		r.response = nil
 	} else {
 		r.buff = &bytes.Buffer{}
