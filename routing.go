@@ -113,10 +113,10 @@ func (h *logRoute) SetLogDir(path string) {
 
 func (h *logRoute) Subrouter(path string) *logRoute {
 	ro := &logRoute{
-		router:      h.router.PathPrefix(path).Subrouter(),
-		logDir:      h.logDir,
-		logger:      h.logger,
-		middlewares: h.middlewares,
+		router: h.router.PathPrefix(path).Subrouter(),
+		logDir: h.logDir,
+		logger: h.logger,
 	}
+	ro.Use(h.middlewares...)
 	return ro
 }
