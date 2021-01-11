@@ -3,30 +3,22 @@ package routing
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"sync"
 
 	"github.com/gorilla/mux"
-	"github.com/gorilla/schema"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
-	spb "google.golang.org/genproto/googleapis/rpc/status"
 )
 
 type logRoute struct {
-	router         *mux.Router
-	middlewares    []mux.MiddlewareFunc
-	logDir         string
-	logger         *logrus.Logger
-	mu             sync.Mutex
-	maxBytesReader *int64
+	router      *mux.Router
+	middlewares []mux.MiddlewareFunc
+	logDir      string
+	logger      *logrus.Logger
+	mu          sync.Mutex
 }
 
 type LogFn func(fields logrus.Fields)
@@ -55,15 +47,16 @@ type LogRoute interface {
 	Handle(path string, handler http.Handler) *mux.Route
 	HandleFunc(path string, handlerFunc http.HandlerFunc) *mux.Route
 	DoHandler(path string, handlerFunc HandlerFunc) *mux.Route
-	ReadSchema(r *http.Request, v interface{}) error
-	WriteJSON(w http.ResponseWriter, v interface{})
-	ReadJSON(r *http.Request, v interface{}) error
-	WriteJSONGrpc(w http.ResponseWriter, v interface{}, err error)
 	ParseUrlVars(r *http.Request, v interface{}) error
 	SetLogDir(string)
+	Subrouter(path string) *logRoute
 }
 
 func New(r *mux.Router, pathPrefix string) LogRoute {
+	return newLogRoute(r, pathPrefix)
+}
+
+func newLogRoute(r *mux.Router, pathPrefix string) *logRoute {
 	workingDir, err := os.Getwd()
 	if err != nil {
 		log.Fatalf("cannot write get working directory: %+v", err)
@@ -105,50 +98,6 @@ func (r *logRoute) Use(middlewares ...mux.MiddlewareFunc) {
 	}
 }
 
-func (h *logRoute) ReadJSON(r *http.Request, v interface{}) error {
-	var (
-		maxBytesReader int64
-	)
-	if !strings.Contains(r.Header.Get("Content-Type"), "application/json") {
-		return errors.New("content-type is not application/json")
-	}
-	if h.maxBytesReader != nil {
-		maxBytesReader = *h.maxBytesReader
-	} else {
-		maxBytesReader = 10 << 20
-	}
-	body := http.MaxBytesReader(nil, r.Body, maxBytesReader)
-	return json.NewDecoder(body).Decode(v)
-}
-
-func (h *logRoute) WriteJSON(w http.ResponseWriter, v interface{}) {
-	w.Header().Add("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(v); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-}
-
-type ResponseWithStatus struct {
-	*spb.Status
-}
-
-func (h *logRoute) WriteJSONGrpc(w http.ResponseWriter, v interface{}, err error) {
-	status, ok := status.FromError(err)
-	if !ok {
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-	if status.Code() != codes.OK {
-		h.WriteJSON(w, &ResponseWithStatus{status.Proto()})
-		return
-	}
-	h.WriteJSON(w, v)
-}
-
-func (h *logRoute) ReadSchema(r *http.Request, v interface{}) error {
-	return schema.NewDecoder().Decode(v, r.URL.Query())
-}
-
 func (h *logRoute) ParseUrlVars(r *http.Request, v interface{}) error {
 	vars := mux.Vars(r)
 	buf, err := json.Marshal(vars)
@@ -160,4 +109,14 @@ func (h *logRoute) ParseUrlVars(r *http.Request, v interface{}) error {
 
 func (h *logRoute) SetLogDir(path string) {
 	h.logDir = path
+}
+
+func (h *logRoute) Subrouter(path string) *logRoute {
+	ro := &logRoute{
+		router:      h.router.PathPrefix(path).Subrouter(),
+		logDir:      h.logDir,
+		logger:      h.logger,
+		middlewares: h.middlewares,
+	}
+	return ro
 }
