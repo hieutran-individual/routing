@@ -25,7 +25,7 @@ func (r *ResponseWriter) Header() http.Header {
 	return r.ResponseWriter.Header()
 }
 
-func (ro *logRoute) useLogging(fn http.Handler) http.Handler {
+func (ro *logRouting) useLogging(fn http.Handler) http.Handler {
 	return HandlerFunc(func(w http.ResponseWriter, r *http.Request, l LogFn) error {
 		rw := &ResponseWriter{
 			status:         200,
@@ -58,7 +58,7 @@ func (ro *logRoute) useLogging(fn http.Handler) http.Handler {
 	})
 }
 
-func (ro *logRoute) writeLog(path string, fields logrus.Fields) {
+func (ro *logRouting) writeLog(path string, fields logrus.Fields) {
 	writer, logCloser := func() (io.Writer, io.Closer) {
 		if _, err := os.Stat(ro.logDir); os.IsNotExist(err) {
 			if err = os.MkdirAll(ro.logDir, 0755); err != nil {

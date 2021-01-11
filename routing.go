@@ -12,7 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type logRoute struct {
+type logRouting struct {
 	router      *mux.Router
 	middlewares []mux.MiddlewareFunc
 	logDir      string
@@ -41,25 +41,25 @@ func (h HandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type LogRoute interface {
+type LogRouting interface {
 	Use(...mux.MiddlewareFunc)
 	Handle(path string, handler http.Handler) *mux.Route
 	HandleFunc(path string, handlerFunc http.HandlerFunc) *mux.Route
 	DoHandler(path string, handlerFunc HandlerFunc) *mux.Route
 	SetLogDir(string)
-	Subrouter(path string) *logRoute
+	Subrouter(path string) *logRouting
 }
 
-func New(r *mux.Router, pathPrefix string) LogRoute {
+func New(r *mux.Router, pathPrefix string) LogRouting {
 	return newLogRoute(r, pathPrefix)
 }
 
-func newLogRoute(r *mux.Router, pathPrefix string) *logRoute {
+func newLogRoute(r *mux.Router, pathPrefix string) *logRouting {
 	workingDir, err := os.Getwd()
 	if err != nil {
 		log.Fatalf("cannot write get working directory: %+v", err)
 	}
-	ro := &logRoute{router: r.PathPrefix(pathPrefix).Subrouter(), logDir: workingDir, logger: logrus.New()}
+	ro := &logRouting{router: r.PathPrefix(pathPrefix).Subrouter(), logDir: workingDir, logger: logrus.New()}
 	ro.middlewares = []mux.MiddlewareFunc{ro.useLogging}
 	ro.logger.SetFormatter(&logrus.JSONFormatter{
 		PrettyPrint:     true,
@@ -78,34 +78,35 @@ func useMiddlewares(fn http.Handler, middlewares ...mux.MiddlewareFunc) http.Han
 	return handler
 }
 
-func (r *logRoute) Handle(path string, handler http.Handler) *mux.Route {
+func (r *logRouting) Handle(path string, handler http.Handler) *mux.Route {
 	return r.router.Handle(path, useMiddlewares(handler, r.middlewares...))
 }
 
-func (r *logRoute) HandleFunc(path string, handlerFunc http.HandlerFunc) *mux.Route {
+func (r *logRouting) HandleFunc(path string, handlerFunc http.HandlerFunc) *mux.Route {
 	return r.router.HandleFunc(path, useMiddlewares(handlerFunc, r.middlewares...).ServeHTTP)
 }
 
-func (r *logRoute) DoHandler(path string, handlerFunc HandlerFunc) *mux.Route {
+func (r *logRouting) DoHandler(path string, handlerFunc HandlerFunc) *mux.Route {
 	return r.router.HandleFunc(path, useMiddlewares(HandlerFunc(handlerFunc), r.middlewares...).ServeHTTP)
 }
 
-func (r *logRoute) Use(middlewares ...mux.MiddlewareFunc) {
+func (r *logRouting) Use(middlewares ...mux.MiddlewareFunc) {
 	for _, mdw := range middlewares {
 		r.middlewares = append(r.middlewares, mdw)
 	}
 }
 
-func (h *logRoute) SetLogDir(path string) {
+func (h *logRouting) SetLogDir(path string) {
 	h.logDir = path
 }
 
-func (h *logRoute) Subrouter(path string) *logRoute {
-	ro := &logRoute{
+func (h *logRouting) Subrouter(path string) *logRouting {
+	ro := &logRouting{
 		router: h.router.PathPrefix(path).Subrouter(),
 		logDir: h.logDir,
 		logger: h.logger,
 	}
+	fmt.Println("length", len(h.middlewares))
 	ro.Use(h.middlewares...)
 	return ro
 }
