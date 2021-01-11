@@ -1,6 +1,8 @@
 package routing
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -8,17 +10,39 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 type responseWriter struct {
 	http.ResponseWriter
-	status int
+	response []byte
+	buff     *bytes.Buffer
+	status   int
 }
 
 func (r *responseWriter) WriteHeader(status int) {
 	r.status = status
 	r.ResponseWriter.WriteHeader(status)
+}
+
+func (r *responseWriter) Header() http.Header {
+	return r.ResponseWriter.Header()
+}
+
+func (r *responseWriter) Writer(body []byte) (int, error) {
+	contentType := http.DetectContentType(body)
+	if contentType != "application/json" {
+		return r.ResponseWriter.Write(body)
+	}
+	if len(body) <= 2>>20 {
+		r.response = nil
+	} else {
+		r.buff = &bytes.Buffer{}
+		writer := io.MultiWriter(r.ResponseWriter, r.buff)
+		return writer.Write(body)
+	}
+	return r.ResponseWriter.Write(body)
 }
 
 func (ro *logRoute) useLogging(fn http.Handler) http.Handler {
@@ -42,8 +66,23 @@ func (ro *logRoute) useLogging(fn http.Handler) http.Handler {
 			"request-uri":    r.RequestURI,
 			"referer":        r.Referer(),
 		}
-
-		fields["http/response"] = logrus.Fields{"status": rw.status}
+		contentType := rw.Header().Get("Content-Type")
+		logResponse := logrus.Fields{
+			"status": rw.status,
+		}
+		if contentType == "application/json" {
+			logResponse["Content-Type"] = "application/json"
+			if rw.response == nil {
+				logResponse["body"] = "body is too large to logging here"
+			}
+			body := logrus.Fields{}
+			if err := json.NewDecoder(rw.buff).Decode(&body); err != nil {
+				logResponse["body"] = errors.WithMessage(err, "cannot decode response body")
+			} else {
+				logResponse["body"] = body
+			}
+		}
+		fields["http/response"] = logResponse
 		ro.writeLog(fmt.Sprintf("handled api took %d (ms)", since), fields)
 		return nil
 	})
