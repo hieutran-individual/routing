@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/gorilla/mux"
 	"github.com/gorilla/schema"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
@@ -62,4 +63,13 @@ func (h *Utils) WriteJSONGrpc(w http.ResponseWriter, v interface{}, err error) {
 
 func (h *Utils) ReadSchema(r *http.Request, v interface{}) error {
 	return schema.NewDecoder().Decode(v, r.URL.Query())
+}
+
+func (h *Utils) ParseUrlVars(r *http.Request, v interface{}) error {
+	vars := mux.Vars(r)
+	buf, err := json.Marshal(vars)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(buf, v)
 }

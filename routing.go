@@ -2,7 +2,6 @@ package routing
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -47,7 +46,6 @@ type LogRoute interface {
 	Handle(path string, handler http.Handler) *mux.Route
 	HandleFunc(path string, handlerFunc http.HandlerFunc) *mux.Route
 	DoHandler(path string, handlerFunc HandlerFunc) *mux.Route
-	ParseUrlVars(r *http.Request, v interface{}) error
 	SetLogDir(string)
 	Subrouter(path string) *logRoute
 }
@@ -96,15 +94,6 @@ func (r *logRoute) Use(middlewares ...mux.MiddlewareFunc) {
 	for _, mdw := range middlewares {
 		r.middlewares = append(r.middlewares, mdw)
 	}
-}
-
-func (h *logRoute) ParseUrlVars(r *http.Request, v interface{}) error {
-	vars := mux.Vars(r)
-	buf, err := json.Marshal(vars)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(buf, v)
 }
 
 func (h *logRoute) SetLogDir(path string) {
