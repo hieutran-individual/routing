@@ -64,11 +64,14 @@ func (ro *logRoute) useLogging(fn http.Handler) http.Handler {
 			"remote":         r.RemoteAddr,
 			"user-agent":     r.UserAgent(),
 			"content-length": r.ContentLength,
+			"content-type":   r.Header.Get("Content-Type"),
 			"request-uri":    r.RequestURI,
 			"referer":        r.Referer(),
 		}
 		logResponse := logrus.Fields{
-			"status": rw.status,
+			"status":         rw.status,
+			"content-type":   rw.Header().Get("Content-Type"),
+			"content-length": rw.Header().Get("Content-Length"),
 		}
 		if rw.response != nil {
 			body := logrus.Fields{}
