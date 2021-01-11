@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -32,7 +33,7 @@ func (r *responseWriter) Header() http.Header {
 
 func (r *responseWriter) Write(body []byte) (int, error) {
 	contentType := http.DetectContentType(body)
-	if contentType != "application/json" {
+	if !strings.Contains(contentType, "text/plain") && !strings.Contains(contentType, "application/json") {
 		return r.ResponseWriter.Write(body)
 	}
 	if len(body) <= 2>>20 {
