@@ -8,9 +8,9 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/schema"
-	spb "google.golang.org/genproto/googleapis/rpc/status"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"github.com/hieutran-individual/status"
+	"github.com/hieutran-individual/status/codes"
+	"github.com/hieutran-individual/status/pb"
 )
 
 type Utils struct {
@@ -46,7 +46,7 @@ func (h *Utils) WriteJSON(w http.ResponseWriter, v interface{}) {
 }
 
 type protoGrpcResponse struct {
-	*spb.Status
+	*pb.Status
 }
 
 func (h *Utils) WriteJSONGrpc(w http.ResponseWriter, v interface{}, err error) {

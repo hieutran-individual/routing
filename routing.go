@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/mux"
+	"github.com/hieutran-individual/status"
 	"github.com/sirupsen/logrus"
 )
 
@@ -37,7 +38,15 @@ func (h HandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	})
 	if err != nil {
-		fields["error"] = fmt.Sprintf("%+v", err)
+		status, ok := status.FromError(err)
+		if !ok {
+			fields["error"] = fmt.Sprintf("%+v", err)
+		} else {
+			fields["error"] = logrus.Fields{
+				"code": status.Code(),
+				// "message"
+			}
+		}
 	}
 }
 
