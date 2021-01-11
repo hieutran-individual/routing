@@ -38,7 +38,6 @@ func (r *ResponseWriter) Write(body []byte) (int, error) {
 	if len(body) >= 2<<20 {
 		r.buff = nil
 	} else {
-		fmt.Println("enter")
 		r.buff = &bytes.Buffer{}
 		writer := io.MultiWriter(r.ResponseWriter, r.buff)
 		return writer.Write(body)

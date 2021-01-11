@@ -3,10 +3,12 @@ package routing
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/mux"
@@ -107,6 +109,9 @@ func (h *logRoute) ReadJSON(r *http.Request, v interface{}) error {
 	var (
 		maxBytesReader int64
 	)
+	if !strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+		return errors.New("content-type is not application/json")
+	}
 	if h.maxBytesReader != nil {
 		maxBytesReader = *h.maxBytesReader
 	} else {
