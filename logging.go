@@ -30,9 +30,8 @@ func (r *responseWriter) Header() http.Header {
 	return r.ResponseWriter.Header()
 }
 
-func (r *responseWriter) Writer(body []byte) (int, error) {
+func (r *responseWriter) Write(body []byte) (int, error) {
 	contentType := http.DetectContentType(body)
-	fmt.Println("content-type", contentType)
 	if contentType != "application/json" {
 		return r.ResponseWriter.Write(body)
 	}
