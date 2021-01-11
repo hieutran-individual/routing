@@ -33,9 +33,11 @@ func (r *responseWriter) Header() http.Header {
 
 func (r *responseWriter) Write(body []byte) (int, error) {
 	contentType := http.DetectContentType(body)
+	fmt.Println("contentType", contentType)
 	if !strings.Contains(contentType, "text/plain") && !strings.Contains(contentType, "application/json") {
 		return r.ResponseWriter.Write(body)
 	}
+	fmt.Println(len(body), 2>>20)
 	if len(body) >= 2>>20 {
 		r.response = nil
 	} else {
@@ -52,14 +54,7 @@ func (ro *logRoute) useLogging(fn http.Handler) http.Handler {
 			status:         200,
 			ResponseWriter: w,
 		}
-		t := time.Now()
-		fn.ServeHTTP(rw, r)
-		since := time.Since(t).Milliseconds()
-		fields, ok := r.Context().Value(CtxLogFn).(logrus.Fields)
-		if !ok {
-			return nil
-		}
-		fields["http/request"] = logrus.Fields{
+		logRequest := logrus.Fields{
 			"method":         r.Method,
 			"remote":         r.RemoteAddr,
 			"user-agent":     r.UserAgent(),
@@ -68,6 +63,22 @@ func (ro *logRoute) useLogging(fn http.Handler) http.Handler {
 			"request-uri":    r.RequestURI,
 			"referer":        r.Referer(),
 		}
+		if strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+			body := logrus.Fields{}
+			if err := ro.ReadJSON(r, &body); err != nil {
+				logRequest["body"] = errors.WithMessage(err, "cannot decode response body")
+			} else {
+				logRequest["body"] = body
+			}
+		}
+		t := time.Now()
+		fn.ServeHTTP(rw, r)
+		since := time.Since(t).Milliseconds()
+		fields, ok := r.Context().Value(CtxLogFn).(logrus.Fields)
+		if !ok {
+			return nil
+		}
+		fields["http/request"] = logRequest
 		logResponse := logrus.Fields{
 			"status":         rw.status,
 			"content-type":   rw.Header().Get("Content-Type"),
