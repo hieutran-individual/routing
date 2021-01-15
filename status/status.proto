@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package pb;
+
+import "google/protobuf/any.proto";
+
+option go_package = "./pb";
+
+message Status {
+  int32 Code = 1;
+  string Message = 2;
+  repeated google.protobuf.Any details = 3;
+}
