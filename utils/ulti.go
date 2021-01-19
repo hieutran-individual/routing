@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/schema"
+	"github.com/gorilla/websocket"
 	"github.com/hieutran-individual/routing/codes"
 	"github.com/hieutran-individual/routing/pb"
 	"github.com/hieutran-individual/routing/status"
@@ -60,10 +61,28 @@ type ProblemJSON struct {
 	Instance string `json:"instance"`
 }
 
+func (h *Utils) WsWriteJSON(conn *websocket.Conn, r *http.Request, v interface{}, err error) {
+	stt, ok := status.FromError(err)
+	if !ok {
+		h.writeLog("this is not the standard status error: %s", err.Error())
+		h.WsWriteJSON(conn, r, v, status.Err(codes.Unknown, err.Error()))
+		return
+	}
+	if stt == nil {
+		if err := conn.WriteJSON(v); err != nil {
+			h.writeLog("cannot write json to websocket response: %s", err.Error())
+			return
+		}
+	}
+	if err := conn.WriteJSON(&ProblemJSON{stt.Proto(), r.URL.Path}); err != nil {
+		h.writeLog("cannot encode problem json: %s", err.Error())
+	}
+}
+
 func (h *Utils) WriteJSON(w http.ResponseWriter, r *http.Request, v interface{}, err error) {
 	stt, ok := status.FromError(err)
 	if !ok {
-		h.writeLog("this is not the standard status error: %+v", err)
+		h.writeLog("this is not the standard status error: %s", err.Error())
 		h.WriteJSON(w, r, v, status.Err(codes.Unknown, err.Error()))
 		return
 	}
